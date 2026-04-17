@@ -10,6 +10,14 @@ use std::time::Duration;
 
 const DEFAULT_BASE: &str = "http://localhost:54235/razer/chromasdk";
 
+fn classify_send_error(e: reqwest::Error) -> ChromaError {
+    if e.is_connect() || e.is_timeout() {
+        ChromaError::SynapseNotRunning
+    } else {
+        ChromaError::Network(e)
+    }
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct Session {
     #[serde(rename = "sessionid")]
@@ -67,7 +75,13 @@ impl ChromaClient {
     }
 
     pub async fn init_session<T: Serialize>(&self, payload: T) -> Result<Session> {
-        let resp = self.http.post(&self.base_url).json(&payload).send().await?;
+        let resp = self
+            .http
+            .post(&self.base_url)
+            .json(&payload)
+            .send()
+            .await
+            .map_err(classify_send_error)?;
         if !resp.status().is_success() {
             return Err(ChromaError::SessionInitFailed(format!("HTTP {}", resp.status())));
         }
@@ -115,5 +129,22 @@ impl ChromaClient {
             tracing::warn!(status = %resp.status(), "delete_session returned non-2xx; ignoring");
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::error::ChromaError;
+
+    #[tokio::test]
+    async fn connection_refused_maps_to_synapse_not_running() {
+        // Port 1 is reserved and will refuse connection on most systems.
+        let client = ChromaClient::with_base_url("http://127.0.0.1:1");
+        let err = client.init_session(serde_json::json!({})).await.unwrap_err();
+        assert!(
+            matches!(err, ChromaError::SynapseNotRunning | ChromaError::Network(_)),
+            "got: {err:?}"
+        );
     }
 }
