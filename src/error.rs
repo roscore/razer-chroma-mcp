@@ -13,6 +13,9 @@ pub enum ChromaError {
     #[error("Session init failed: {0}")]
     SessionInitFailed(String),
 
+    #[error("Chroma effect PUT failed: {0}")]
+    EffectPutFailed(String),
+
     #[error("Heartbeat failed ({failures}× in a row): {cause}")]
     HeartbeatFailed { failures: u32, cause: String },
 

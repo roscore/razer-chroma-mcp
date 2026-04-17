@@ -86,7 +86,7 @@ impl ChromaClient {
         let url = format!("{}/{}", session_uri.trim_end_matches('/'), device_path);
         let resp = self.http.put(&url).json(effect).send().await?;
         if !resp.status().is_success() {
-            return Err(ChromaError::SessionInitFailed(format!(
+            return Err(ChromaError::EffectPutFailed(format!(
                 "PUT {} -> HTTP {}",
                 url,
                 resp.status()
