@@ -5,7 +5,7 @@
 
 use crate::chroma::client::{Author, ChromaClient, InitPayload};
 use crate::chroma::effects::EffectEnvelope;
-use crate::error::{ChromaError, Result};
+use crate::error::Result;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
@@ -29,7 +29,7 @@ impl Default for SessionConfig {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SessionStatus {
     Uninitialized,
     Healthy,
@@ -96,7 +96,7 @@ impl Session {
     }
 
     pub async fn status(&self) -> SessionStatus {
-        self.inner.read().await.status.clone()
+        self.inner.read().await.status
     }
 
     pub async fn uri(&self) -> String {
@@ -143,6 +143,9 @@ impl Session {
         }
     }
 
+    /// Linear-backoff reconnect. Each `init_session` call is bounded by the
+    /// ChromaClient HTTP timeout (2s by default, see `RAZER_CHROMA_TIMEOUT_MS`).
+    /// After `reinit_max` failed attempts, status transitions to `Degraded`.
     async fn reconnect(&self) {
         for attempt in 1..=self.cfg.reinit_max {
             match self.client.init_session(default_init_payload()).await {
@@ -176,7 +179,3 @@ impl Session {
         self.inner.write().await.status = SessionStatus::ShutDown;
     }
 }
-
-// Keep the unused-imports clean when ChromaError is only used for type aliasing downstream.
-#[allow(dead_code)]
-fn _unused(_: ChromaError) {}
