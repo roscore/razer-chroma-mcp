@@ -143,14 +143,20 @@ pub enum ClaudeState {
     Thinking,
     NeedsInput,
     /// One-shot transition state. On completion, restores the previous persistent state.
-    Complete { previous: Box<PersistentState> },
+    /// Invariant: `previous` is always a `PersistentState`, which excludes `Complete` —
+    /// `Complete` is never nested inside itself. Enforced by the type.
+    Complete { previous: PersistentState },
     Error,
 }
 
-/// The states that `Complete` can restore to.
+/// The states that `Complete` can restore to. Excludes `Complete` itself by construction.
+/// Kept as its own enum (rather than `ClaudeState`) to make that invariant type-level
+/// rather than a runtime check.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PersistentState { Off, UserControlled, Idle, Thinking, NeedsInput, Error }
 ```
+
+`PersistentState` is itself `Copy` and small (single byte discriminant), so `ClaudeState` remains `Copy`.
 
 ### 5.3 State Transition Table
 
@@ -158,13 +164,13 @@ Handlers are serialized through a single `Mutex<ControllerInner>`. A transition 
 
 | From \ Incoming | `signal_thinking` | `signal_needs_input` | `signal_idle` | `signal_complete` | `signal_error` | *low-level tool call* |
 |---|---|---|---|---|---|---|
-| `Off` | → Thinking | → NeedsInput | → Idle | → Complete{prev:Off} | → Error | → UserControlled |
-| `UserControlled` | → Thinking | → NeedsInput | → Idle | → Complete{prev:UserControlled} | → Error | → UserControlled (frame replaced) |
-| `Idle` | → Thinking | → NeedsInput | (no-op) | → Complete{prev:Idle} | → Error | → UserControlled |
-| `Thinking` | (no-op, restart animator) | → NeedsInput | → Idle | → Complete{prev:Thinking} | → Error | → UserControlled |
-| `NeedsInput` | → Thinking | (no-op, restart animator) | → Idle | → Complete{prev:NeedsInput} | → Error | → UserControlled |
+| `Off` | → Thinking | → NeedsInput | → Idle | → Complete{previous:Off} | → Error | → UserControlled |
+| `UserControlled` | → Thinking | → NeedsInput | → Idle | → Complete{previous:UserControlled} | → Error | → UserControlled (frame replaced) |
+| `Idle` | → Thinking | → NeedsInput | (no-op) | → Complete{previous:Idle} | → Error | → UserControlled |
+| `Thinking` | (no-op, restart animator) | → NeedsInput | → Idle | → Complete{previous:Thinking} | → Error | → UserControlled |
+| `NeedsInput` | → Thinking | (no-op, restart animator) | → Idle | → Complete{previous:NeedsInput} | → Error | → UserControlled |
 | `Complete` | → Thinking (interrupts one-shot) | → NeedsInput (interrupts) | → Idle (interrupts) | (no-op, restart) | → Error (interrupts) | → UserControlled (interrupts) |
-| `Error` | → Thinking | → NeedsInput | → Idle | → Complete{prev:Error} | (no-op, restart) | → UserControlled |
+| `Error` | → Thinking | → NeedsInput | → Idle | → Complete{previous:Error} | (no-op, restart) | → UserControlled |
 
 Complete auto-transition: when the Complete one-shot finishes, the controller itself issues a synthetic transition to `previous`.
 
@@ -217,7 +223,11 @@ Only the **generic 6×22 keyboard grid** (`/keyboard`) is targeted for patterns.
 
 ### 5.9 Idle Auto-Entry
 
-`signals::inactivity` tracks the timestamp of the most recent `signal_*` or low-level tool call. If the server has been in a non-`Off`/non-`Idle` state for more than **10 minutes** with no activity, the controller auto-transitions to `Idle`. The timeout is hard-coded for v0.1.0; overrideable via env `RAZER_CHROMA_IDLE_MS` for testing.
+`signals::inactivity` tracks the timestamp of the most recent `signal_*` or low-level tool call. If the server has been in `UserControlled` or `Error` for more than **10 minutes** with no activity, the controller auto-transitions to `Idle`.
+
+**Explicitly excluded from auto-entry**: `Thinking` and `NeedsInput`. Both are semantically "someone is waiting" — `Thinking` because Claude is mid-work (a long response may legitimately not refresh the signal), `NeedsInput` because the entire purpose is to keep signaling until the user responds. Auto-demoting either would defeat the feature.
+
+The timeout is hard-coded for v0.1.0; overrideable via env `RAZER_CHROMA_IDLE_MS` for testing.
 
 ## 6. MCP Tools (12 total)
 
@@ -324,17 +334,21 @@ This is the single riskiest operation in the installer and has its own specifica
 **Algorithm**:
 
 1. **Read** the file. If missing, treat as `{}`.
-2. **Parse** as JSON. If parse fails:
+2. **Parse** as strict JSON (no comments, no trailing commas — Claude Desktop writes strict JSON; any user hand-edit with JSONC syntax is treated as parse failure). If parse fails:
    - Copy the file to `<path>.corrupt-<timestamp>` for user recovery.
    - Abort with a clear error telling the user where the quarantine is and that they must fix or delete the corrupt file.
 3. **Validate** root is an object; if not, abort with error (do not overwrite non-standard configs).
-4. **Deep-merge** our entry: if `mcpServers` object exists, add/replace `razer-chroma` key, preserving all other keys. If it does not exist, create it. Do not touch any other top-level keys.
+4. **Deep-merge** our entry:
+   - If `mcpServers` key is absent → create it as an object with our entry.
+   - If `mcpServers` is an object → add/replace our `razer-chroma` key, preserving all other keys in the object.
+   - If `mcpServers` is present but **not an object** (e.g. array, string, number, null) → abort with an error analogous to step 3; do not clobber. The error directs the user to manually fix the file or delete it.
+   - Do not touch any other top-level keys.
 5. **Atomic write**: serialize to a temp file in the same directory (`<path>.tmp-<pid>`), `fsync`, then `rename` over the original. On Windows, use `MoveFileEx` with `MOVEFILE_REPLACE_EXISTING`.
 6. **Backup**: before step 5, copy the original to `<path>.bak-<timestamp>`. Retain the 3 most recent backups; prune older.
 7. **Idempotent re-run**: if the current entry is byte-for-byte identical to ours, skip write.
 8. **Race with Claude Desktop**: we do not lock the file (Windows has no portable advisory file locks that Claude Desktop also respects). The atomic rename means Claude Desktop either sees the old file or the new file — never a partial write. If Claude Desktop wrote after our read but before our rename, we may overwrite its changes; this is acceptable because Claude Desktop writes this file only at startup/config-UI-save moments, and we prompt the user to close Claude Desktop before setup. Uninstall warns even louder (§7.5).
 
-Unit tests cover: missing file, empty file, `{}`, file with other servers, malformed JSON, non-object root, idempotent re-run, backup rotation.
+Unit tests cover: missing file, empty file, `{}`, file with other servers, malformed JSON, non-object root, **non-object `mcpServers`**, idempotent re-run, backup rotation.
 
 ## 8. Error Handling
 
@@ -519,7 +533,7 @@ Each milestone ends with a status report and explicit user approval before conti
 - [ ] `needs_input` stage-1 flash measured ≥90% brightness within 900 ms (integration test)
 - [ ] Full state transition table (§5.3) passes unit tests
 - [ ] Session auto-recovers from Synapse restart within 15 seconds
-- [ ] Config merge strategy (§7.6) passes all 8 unit test cases including idempotent re-run and corrupt-file quarantine
+- [ ] Config merge strategy (§7.6) passes all 9 unit test cases including idempotent re-run and corrupt-file quarantine
 - [ ] `cargo fmt`, `cargo clippy -D warnings`, `cargo test` all pass in CI on `windows-latest`
 - [ ] Documentation reviewed for clarity by at least one non-technical reader
 
@@ -529,3 +543,4 @@ Each milestone ends with a status report and explicit user approval before conti
 
 - **rev 1** (2026-04-17): Initial draft.
 - **rev 2** (2026-04-17): Addressed review findings B1–B4, S1–S12, and adopted nice-to-haves N1, N2, N3, N4, N5. Key changes: explicit state transition table (§5.3), §5.7 animator cancellation semantics, §5.9 idle auto-entry, §7.6 config merge strategy, §7.1 per-user install / code signing stance, §12 log destination, §5.4 measurable `needs_input` criterion, Anthropic trademark line, `pattern` subcommand, `insta` for snapshots.
+- **rev 2.1** (2026-04-17): Addressed second-pass review findings NS1–NS3 and NN1–NN2. Changes: §5.2 unboxed `Complete::previous` to resolve `Copy`+`Box` conflict and added invariant note; §5.9 excluded `Thinking`/`NeedsInput` from idle auto-entry; §7.6 added explicit branch for non-object `mcpServers`, strict-JSON policy note, and matching unit test case.
