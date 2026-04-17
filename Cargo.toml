@@ -1,0 +1,36 @@
+[package]
+name = "razer-chroma-mcp"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+authors = ["roscore <https://github.com/roscore>"]
+license = "MIT OR Apache-2.0"
+description = "MCP server that gives Claude a body language on Razer Chroma keyboards"
+repository = "https://github.com/roscore/razer-chroma-mcp"
+readme = "README.md"
+keywords = ["mcp", "razer", "chroma", "rgb", "claude"]
+categories = ["command-line-utilities"]
+
+[dependencies]
+anyhow = "1"
+thiserror = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "signal", "io-std"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+clap = { version = "4", features = ["derive"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+tracing-appender = "0.2"
+
+[dev-dependencies]
+insta = { version = "1", features = ["json"] }
+wiremock = "0.6"
+tokio = { version = "1", features = ["test-util", "macros", "rt-multi-thread"] }
+tempfile = "3"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
