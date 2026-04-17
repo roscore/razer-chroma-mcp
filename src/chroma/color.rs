@@ -38,6 +38,15 @@ impl Rgb {
             _ => Err(ChromaError::InvalidColor(format!("length must be 3 or 6 hex digits: {s}"))),
         }
     }
+
+    /// Chroma SDK wire format: 0x00BBGGRR. Red is the low byte.
+    pub const fn to_bgr_u32(self) -> u32 {
+        (self.b as u32) << 16 | (self.g as u32) << 8 | self.r as u32
+    }
+
+    pub const fn from_bgr_u32(v: u32) -> Self {
+        Self::new((v & 0xFF) as u8, ((v >> 8) & 0xFF) as u8, ((v >> 16) & 0xFF) as u8)
+    }
 }
 
 #[cfg(test)]
@@ -72,5 +81,23 @@ mod tests {
     #[test]
     fn parses_case_insensitive() {
         assert_eq!(Rgb::from_hex("#d97757").unwrap(), Rgb::from_hex("#D97757").unwrap());
+    }
+
+    #[test]
+    fn bgr_u32_packs_low_to_high() {
+        // Chroma SDK encodes as 0x00BBGGRR (little-endian BGR).
+        let c = Rgb::new(0xD9, 0x77, 0x57);
+        assert_eq!(c.to_bgr_u32(), 0x00_57_77_D9);
+    }
+
+    #[test]
+    fn bgr_u32_round_trip() {
+        let c = Rgb::new(0x12, 0x34, 0x56);
+        assert_eq!(Rgb::from_bgr_u32(c.to_bgr_u32()), c);
+    }
+
+    #[test]
+    fn bgr_u32_black_is_zero() {
+        assert_eq!(Rgb::BLACK.to_bgr_u32(), 0);
     }
 }
