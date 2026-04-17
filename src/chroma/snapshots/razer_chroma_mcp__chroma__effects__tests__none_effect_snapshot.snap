@@ -1,0 +1,7 @@
+---
+source: src/chroma/effects.rs
+expression: "EffectEnvelope::none()"
+---
+{
+  "effect": "CHROMA_NONE"
+}

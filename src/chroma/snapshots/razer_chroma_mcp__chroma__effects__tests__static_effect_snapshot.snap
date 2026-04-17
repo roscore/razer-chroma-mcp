@@ -1,0 +1,10 @@
+---
+source: src/chroma/effects.rs
+expression: payload
+---
+{
+  "effect": "CHROMA_STATIC",
+  "param": {
+    "color": 5732313
+  }
+}

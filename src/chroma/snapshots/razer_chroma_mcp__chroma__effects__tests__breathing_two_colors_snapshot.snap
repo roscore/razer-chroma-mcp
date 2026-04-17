@@ -1,0 +1,12 @@
+---
+source: src/chroma/effects.rs
+expression: p
+---
+{
+  "effect": "CHROMA_BREATHING",
+  "param": {
+    "color1": 2303806,
+    "color2": 15134448,
+    "type": 3
+  }
+}
