@@ -10,7 +10,11 @@ pub mod uninstall;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser, Debug)]
-#[command(name = "razer-chroma-mcp", version, about = "MCP server for Razer Chroma devices")]
+#[command(
+    name = "razer-chroma-mcp",
+    version,
+    about = "MCP server for Razer Chroma devices"
+)]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Command>,
