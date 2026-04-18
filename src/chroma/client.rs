@@ -114,9 +114,19 @@ impl ChromaClient {
     }
 
     /// PUT a heartbeat to `<uri>/heartbeat`.
+    ///
+    /// Synapse's Chroma REST endpoint rejects bodyless PUTs with `HTTP 411
+    /// Length Required`, so we send an explicit empty JSON object. This keeps
+    /// the heartbeat cycle from snowballing into `Reconnecting` → `Degraded`
+    /// on long-lived sessions (observed on live hardware, T3.7).
     pub async fn heartbeat(&self, session_uri: &str) -> Result<()> {
         let url = format!("{}/heartbeat", session_uri.trim_end_matches('/'));
-        let resp = self.http.put(&url).send().await?;
+        let resp = self
+            .http
+            .put(&url)
+            .json(&serde_json::json!({}))
+            .send()
+            .await?;
         if !resp.status().is_success() {
             return Err(ChromaError::HeartbeatFailed {
                 failures: 1,
