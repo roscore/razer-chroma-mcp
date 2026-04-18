@@ -1,0 +1,47 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.85.0
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build release binary
+        run: cargo build --release
+
+      - name: Install NSIS
+        run: choco install nsis -y --no-progress
+
+      - name: Install EnVar plugin
+        shell: pwsh
+        run: |
+          $url = "https://nsis.sourceforge.io/mediawiki/images/7/7f/EnVar_plugin.zip"
+          Invoke-WebRequest -Uri $url -OutFile envar.zip
+          Expand-Archive envar.zip -DestinationPath envar
+          Copy-Item envar\Plugins\x86-ansi\EnVar.dll "C:\Program Files (x86)\NSIS\Plugins\x86-ansi\"
+
+      - name: Determine version
+        id: ver
+        shell: pwsh
+        run: |
+          $tag = "${env:GITHUB_REF}" -replace "refs/tags/v",""
+          "version=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Build installer
+        working-directory: installer
+        run: makensis /DVERSION=${{ steps.ver.outputs.version }} razer-chroma-mcp.nsi
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            installer/razer-chroma-mcp-setup-${{ steps.ver.outputs.version }}.exe
+            target/release/razer-chroma-mcp.exe
