@@ -222,6 +222,7 @@ impl Controller {
 // ──────────────────────────────────────────────────────────────────────────────
 
 use crate::signals::animator::{self, AnimatorHandle};
+use crate::signals::inactivity::{self, Inactivity};
 use std::future::Future;
 use std::pin::Pin;
 use tokio::sync::Mutex;
@@ -248,6 +249,7 @@ pub struct StatefulController {
     client: ChromaClient,
     session: Arc<OnceCell<Session>>,
     pub inner: Arc<Mutex<ControllerInner>>,
+    inactivity: Inactivity,
 }
 
 impl Default for StatefulController {
@@ -256,6 +258,7 @@ impl Default for StatefulController {
             client: ChromaClient::default(),
             session: Arc::new(OnceCell::new()),
             inner: Arc::new(Mutex::new(ControllerInner::default())),
+            inactivity: Inactivity::new(),
         }
     }
 }
@@ -283,6 +286,7 @@ impl StatefulController {
             next
         };
         self.swap_animator_for(next).await?;
+        self.inactivity.bump().await;
         Ok(next)
     }
 
@@ -349,10 +353,33 @@ impl StatefulController {
         let session = self.session().await?;
         session.put_effect("keyboard", &effect).await?;
         self.inner.lock().await.last_user_frame = Some(effect);
+        self.inactivity.bump().await;
         Ok(())
     }
 
+    /// Spawn the idle-auto-entry watcher. Uses `RAZER_CHROMA_IDLE_MS` env override
+    /// (default 10 min). The watcher fires `Incoming::Idle` when the timeout elapses
+    /// AND the state is eligible (UserControlled / Error — see `Inactivity::eligible`).
+    pub async fn start_idle_watcher(&self) {
+        let get_state = {
+            let inner = self.inner.clone();
+            move || inner.try_lock().map(|g| g.state).unwrap_or(ClaudeState::Off)
+        };
+        let trigger_ctrl = self.clone();
+        self.inactivity.clone().spawn_watcher(
+            inactivity::timeout_from_env(),
+            get_state,
+            move || {
+                let ctrl = trigger_ctrl.clone();
+                async move {
+                    let _ = ctrl.transition(Incoming::Idle).await;
+                }
+            },
+        );
+    }
+
     pub async fn shutdown(&self) {
+        self.inactivity.cancel();
         let handle = { self.inner.lock().await.animator.take() };
         if let Some(h) = handle {
             h.cancel_force();
