@@ -267,9 +267,44 @@ impl StatefulController {
     pub async fn session(&self) -> Result<Session> {
         let s = self
             .session
-            .get_or_try_init(|| Session::init(self.client.clone(), SessionConfig::default()))
+            .get_or_try_init(|| async {
+                let s = Session::init(self.client.clone(), SessionConfig::default()).await?;
+                // Spawn the reconnect-restore watcher exactly once per session.
+                let notify = s.reconnected_notify();
+                let me = self.clone();
+                tokio::spawn(async move {
+                    loop {
+                        notify.notified().await;
+                        me.restore_after_reconnect().await;
+                    }
+                });
+                Ok::<_, crate::error::ChromaError>(s)
+            })
             .await?;
         Ok(s.clone())
+    }
+
+    /// Re-apply Chroma state after a session reconnect (spec §5.8). For
+    /// `UserControlled` we replay the cached frame; for every other persistent
+    /// state we re-drive the state machine which respawns the animator.
+    async fn restore_after_reconnect(&self) {
+        let (state, last_frame) = {
+            let g = self.inner.lock().await;
+            (g.state, g.last_user_frame.clone())
+        };
+        match state {
+            ClaudeState::UserControlled => {
+                if let (Some(effect), Some(session)) = (last_frame, self.session.get().cloned()) {
+                    let _ = session.put_effect("keyboard", &effect).await;
+                }
+            }
+            ClaudeState::Off => {
+                // Nothing to restore.
+            }
+            other => {
+                let _ = self.force_transition(other).await;
+            }
+        }
     }
 
     pub async fn current_state(&self) -> ClaudeState {

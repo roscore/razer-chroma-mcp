@@ -8,7 +8,7 @@ use crate::chroma::effects::EffectEnvelope;
 use crate::error::Result;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::RwLock;
+use tokio::sync::{Notify, RwLock};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
@@ -52,6 +52,9 @@ pub struct Session {
     inner: Arc<RwLock<Inner>>,
     cancel: CancellationToken,
     hb_handle: Arc<tokio::sync::Mutex<Option<JoinHandle<()>>>>,
+    /// Fired after a successful reconnect. Observers restore Chroma state
+    /// (see `StatefulController::restore_after_reconnect`).
+    reconnected: Arc<Notify>,
 }
 
 pub fn default_init_payload() -> InitPayload {
@@ -89,6 +92,7 @@ impl Session {
             inner,
             cancel: cancel.clone(),
             hb_handle: Arc::new(tokio::sync::Mutex::new(None)),
+            reconnected: Arc::new(Notify::new()),
         };
         let handle = tokio::spawn(me.clone().run_heartbeat(cancel));
         *me.hb_handle.lock().await = Some(handle);
@@ -97,6 +101,12 @@ impl Session {
 
     pub async fn status(&self) -> SessionStatus {
         self.inner.read().await.status
+    }
+
+    /// Returns a handle fired whenever `reconnect()` successfully re-inits
+    /// the Chroma session. Observers re-apply cached state (spec §5.8).
+    pub fn reconnected_notify(&self) -> Arc<Notify> {
+        self.reconnected.clone()
     }
 
     pub async fn uri(&self) -> String {
@@ -150,11 +160,14 @@ impl Session {
         for attempt in 1..=self.cfg.reinit_max {
             match self.client.init_session(default_init_payload()).await {
                 Ok(s) => {
-                    let mut g = self.inner.write().await;
-                    g.uri = s.uri;
-                    g.status = SessionStatus::Healthy;
-                    g.failures = 0;
+                    {
+                        let mut g = self.inner.write().await;
+                        g.uri = s.uri;
+                        g.status = SessionStatus::Healthy;
+                        g.failures = 0;
+                    }
                     tracing::info!(attempt, "session reconnected");
+                    self.reconnected.notify_waiters();
                     return;
                 }
                 Err(e) => {
