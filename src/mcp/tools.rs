@@ -5,7 +5,7 @@ use crate::chroma::color::Rgb;
 use crate::signals::controller::Controller;
 use anyhow::{anyhow, Result};
 use schemars::JsonSchema;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, JsonSchema)]
 pub struct SetStaticColorArgs {
@@ -29,23 +29,36 @@ impl ColorInput {
     }
 }
 
-pub async fn set_static_color(ctrl: &Controller, args: SetStaticColorArgs) -> Result<serde_json::Value> {
+/// Structured output for tools that only signal success/failure.
+#[derive(Serialize, JsonSchema)]
+pub struct StatusOutput {
+    pub status: String,
+}
+
+/// Structured output for `get_session_status`.
+#[derive(Serialize, JsonSchema)]
+pub struct SessionStatusOutput {
+    pub initialized: bool,
+    pub state: String,
+}
+
+pub async fn set_static_color(ctrl: &Controller, args: SetStaticColorArgs) -> Result<StatusOutput> {
     let rgb = args.color.to_rgb()?;
     ctrl.set_static(rgb).await.map_err(|e| anyhow!(e))?;
-    Ok(serde_json::json!({ "status": "ok" }))
+    Ok(StatusOutput { status: "ok".to_string() })
 }
 
-pub async fn clear_all(ctrl: &Controller) -> Result<serde_json::Value> {
+pub async fn clear_all(ctrl: &Controller) -> Result<StatusOutput> {
     ctrl.clear_all().await.map_err(|e| anyhow!(e))?;
-    Ok(serde_json::json!({ "status": "ok" }))
+    Ok(StatusOutput { status: "ok".to_string() })
 }
 
-pub async fn get_session_status(ctrl: &Controller) -> Result<serde_json::Value> {
+pub async fn get_session_status(ctrl: &Controller) -> Result<SessionStatusOutput> {
     let status = ctrl.session_status().await;
-    Ok(serde_json::json!({
-        "initialized": !matches!(status, crate::chroma::session::SessionStatus::Uninitialized),
-        "state": format!("{status:?}"),
-    }))
+    Ok(SessionStatusOutput {
+        initialized: !matches!(status, crate::chroma::session::SessionStatus::Uninitialized),
+        state: format!("{status:?}"),
+    })
 }
 
 #[cfg(test)]

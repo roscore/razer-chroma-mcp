@@ -2,6 +2,8 @@
 //!
 //! All calls time out after 2 seconds unless overridden by
 //! `RAZER_CHROMA_TIMEOUT_MS` at construction time.
+//! The base URL defaults to `http://localhost:54235` but can be overridden via
+//! `RAZER_CHROMA_BASE_URL` for tests.
 
 use crate::error::{ChromaError, Result};
 use reqwest::Client;
@@ -48,7 +50,9 @@ pub struct ChromaClient {
 
 impl Default for ChromaClient {
     fn default() -> Self {
-        Self::with_base_url(DEFAULT_BASE)
+        let base = std::env::var("RAZER_CHROMA_BASE_URL")
+            .unwrap_or_else(|_| DEFAULT_BASE.to_string());
+        Self::with_base_url(&base)
     }
 }
 

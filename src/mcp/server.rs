@@ -7,7 +7,7 @@
 //! Handler delegation semantics match the plan: each method calls into
 //! `crate::mcp::tools::*` and wraps the response in `Json<serde_json::Value>`.
 
-use crate::mcp::tools::{self, SetStaticColorArgs};
+use crate::mcp::tools::{self, SessionStatusOutput, SetStaticColorArgs, StatusOutput};
 use crate::signals::controller::Controller;
 use anyhow::Result;
 use rmcp::handler::server::router::tool::ToolRouter;
@@ -45,7 +45,7 @@ impl RazerChromaServer {
         &self,
         #[allow(clippy::needless_pass_by_value)] // Parameters<T> consumes by value per rmcp 1.5 API
         Parameters(args): Parameters<SetStaticColorArgs>,
-    ) -> Result<Json<serde_json::Value>, ErrorData> {
+    ) -> Result<Json<StatusOutput>, ErrorData> {
         let value = tools::set_static_color(&self.ctrl, args)
             .await
             .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
@@ -54,7 +54,7 @@ impl RazerChromaServer {
 
     /// Release the keyboard back to system control (Chroma NONE).
     #[tool(description = "Release the keyboard back to system control (sends Chroma NONE).")]
-    pub async fn clear_all(&self) -> Result<Json<serde_json::Value>, ErrorData> {
+    pub async fn clear_all(&self) -> Result<Json<StatusOutput>, ErrorData> {
         let value = tools::clear_all(&self.ctrl)
             .await
             .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
@@ -63,7 +63,7 @@ impl RazerChromaServer {
 
     /// Inspect the Chroma session health.
     #[tool(description = "Return the current Chroma session state (initialized flag + debug state string).")]
-    pub async fn get_session_status(&self) -> Result<Json<serde_json::Value>, ErrorData> {
+    pub async fn get_session_status(&self) -> Result<Json<SessionStatusOutput>, ErrorData> {
         let value = tools::get_session_status(&self.ctrl)
             .await
             .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
