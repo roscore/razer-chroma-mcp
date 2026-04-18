@@ -5,7 +5,8 @@
 //! `rmcp::server::Server::builder().tool(...)` surface; rmcp 1.5 exposes
 //! `#[tool]`/`#[tool_router]`/`#[tool_handler]` attribute macros instead.
 //! Handler delegation semantics match the plan: each method calls into
-//! `crate::mcp::tools::*` and wraps the response in `Json<serde_json::Value>`.
+//! `crate::mcp::tools::*` and wraps the response in `Json<StatusOutput>` or
+//! `Json<SessionStatusOutput>`.
 
 use crate::mcp::tools::{self, SessionStatusOutput, SetStaticColorArgs, StatusOutput};
 use crate::signals::controller::Controller;

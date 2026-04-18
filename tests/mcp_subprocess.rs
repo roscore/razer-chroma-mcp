@@ -67,7 +67,8 @@ async fn get_session_status_round_trip() {
         }),
     )
     .await;
-    let _init = tokio::time::timeout(Duration::from_secs(5), recv(&mut stdout))
+    // 15s covers cold-start of the debug binary on a loaded CI runner.
+    let _init = tokio::time::timeout(Duration::from_secs(15), recv(&mut stdout))
         .await
         .expect("initialize response timeout");
 
@@ -92,14 +93,27 @@ async fn get_session_status_round_trip() {
         }),
     )
     .await;
-    let resp = tokio::time::timeout(Duration::from_secs(5), recv(&mut stdout))
+    let resp = tokio::time::timeout(Duration::from_secs(15), recv(&mut stdout))
         .await
         .expect("tools/call response timeout");
-    let body = resp.pointer("/result").expect("result present");
-    assert!(
-        body.to_string().contains("initialized"),
-        "expected 'initialized' key in tool result; got {body}"
+    let result = resp.pointer("/result").expect("result present");
+    // The tool should not have returned an error envelope.
+    assert_ne!(
+        result.pointer("/isError"),
+        Some(&serde_json::Value::Bool(true)),
+        "tool call returned isError=true; full body: {result}"
+    );
+    // The session was never initialized (mock Synapse returns 500 on init).
+    // get_session_status must therefore report initialized=false in structuredContent.
+    let initialized = result
+        .pointer("/structuredContent/initialized")
+        .unwrap_or_else(|| panic!("structuredContent.initialized missing; body: {result}"));
+    assert_eq!(
+        initialized,
+        &serde_json::Value::Bool(false),
+        "expected initialized=false; got body: {result}"
     );
 
     tokio::process::Child::kill(&mut child).await.unwrap();
+    let _ = child.wait().await;
 }
