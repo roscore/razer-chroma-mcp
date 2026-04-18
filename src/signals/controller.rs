@@ -320,9 +320,31 @@ impl StatefulController {
         }
     }
 
+    /// Refuses the call with an actionable error when the session is
+    /// `Degraded`. Called at the top of effect-applying tool paths (spec §8.1).
+    async fn guard_healthy(&self) -> Result<()> {
+        let session = self.session().await?;
+        if matches!(session.status().await, SessionStatus::Degraded) {
+            return Err(crate::error::ChromaError::SessionInitFailed(
+                "Chroma session is DEGRADED — restart Razer Synapse, then run `razer-chroma-mcp doctor` for diagnostics. / Chroma 세션이 DEGRADED입니다. Razer Synapse를 재시작한 뒤 `razer-chroma-mcp doctor`를 실행해주세요.".into(),
+            ));
+        }
+        Ok(())
+    }
+
     /// Transition to the state produced by applying `incoming` to the current state.
     /// Cancels the current animator gracefully (≤200ms) before spawning the new one.
     pub async fn transition(&self, incoming: Incoming) -> Result<ClaudeState> {
+        let peek_next = {
+            let g = self.inner.lock().await;
+            next_state(g.state, incoming)
+        };
+        // Pre-flight: only block when the target state would actually drive
+        // the keyboard. Off / UserControlled still accept transitions so
+        // `clear_all` and LowLevelTool cleanup paths work under Degraded.
+        if !matches!(peek_next, ClaudeState::Off | ClaudeState::UserControlled) {
+            self.guard_healthy().await?;
+        }
         let next = {
             let mut g = self.inner.lock().await;
             let next = next_state(g.state, incoming);
@@ -393,6 +415,7 @@ impl StatefulController {
 
     /// Low-level frame write — transitions to `UserControlled` and caches the frame.
     pub async fn apply_user_frame(&self, effect: EffectEnvelope) -> Result<()> {
+        self.guard_healthy().await?;
         self.transition(Incoming::LowLevelTool).await?;
         let session = self.session().await?;
         session.put_effect("keyboard", &effect).await?;
