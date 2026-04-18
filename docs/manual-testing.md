@@ -62,3 +62,34 @@ out-of-band hardware/IPC runs that cannot be reproduced in CI.
 - `Controller::default()` hard-codes `SessionConfig::default()`; inject via
   `Controller::new` in M4 so tests (and the future `doctor` subcommand) can
   tune heartbeat/reinit without env vars.
+
+## M4 — <YYYY-MM-DD> (template, fill on live run)
+
+**Environment**
+- Host: Windows 11, rustc 1.94.1, `cargo build` debug profile
+- Binary: `target/debug/razer-chroma-mcp.exe`
+- Razer Synapse: running, Chroma SDK module enabled
+- Razer hardware: BlackWidow (6×22 grid)
+- Test harness: scripted MCP client (NDJSON stdio) driving `serve` subcommand
+
+**Scenarios**
+
+| # | Call | Expected visual | Pass? | Notes |
+| - | ---- | --------------- | ----- | ----- |
+| 1 | `signal_thinking` | Radial pulse from keyboard center, terracotta↔cream, ~2.8 s cycle, 35–65% brightness | | |
+| 2 | `signal_needs_input` | 3× cream flash in first 900 ms (≥90% brightness), then TERRACOTTA breathing 1.2 s cycle with spacebar + Enter + Esc cream accents on 0.75 s counter-rhythm | | Does it feel "강렬하게 인상"? |
+| 3 | `signal_idle` | Deep ember slow breathing, 12 s cycle, 5–12% brightness | | Uses built-in CHROMA_BREATHING (one PUT) |
+| 4 | `signal_complete` (during Thinking) | 900 ms terracotta sweep L→R → 180 ms central cream asterisk flash → 400 ms fade → automatic restore to Thinking | | Asterisk visibly legible? |
+| 5 | `signal_error` | Burnt rust slow breathing, 2.5 s cycle, 40–80% brightness | | |
+| 6 | `set_static_color #D97757` after signal | Keyboard fills terracotta, state becomes UserControlled; signals cancel animator | | |
+| 7 | Idle auto-entry (`RAZER_CHROMA_IDLE_MS=2000`, wait 3 s after UserControlled) | Transitions to Idle (deep ember breathing) automatically | | Eligibility: UserControlled + Error only |
+| 8 | Reconnect restore (toggle Synapse / pull cable, then restore) | After `session reconnected` tracing log, the last persistent state re-appears (or cached user frame re-applied if UserControlled) | | Covers T4.13 |
+
+**Observations**
+
+<fill in after run>
+
+**Carryovers**
+
+<fill in>
+

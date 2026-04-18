@@ -28,9 +28,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   MCP handshake + `tools/call` over NDJSON against a wiremock-backed Synapse.
 - `docs/manual-testing.md` — live end-to-end smoke log for milestones that
   need real hardware + Synapse.
+- Anthropic warm palette (`TERRACOTTA` / `WARM_CREAM` / `DEEP_EMBER` / `BURNT_RUST`)
+  with `lerp` and `scale` helpers. Spec §5.1.
+- `ClaudeState` / `PersistentState` enums with type-level
+  Complete-never-nested invariant. Spec §5.2.
+- Full state transition table (spec §5.3) covered by 42 unit tests.
+- Animator runtime at 20 FPS with graceful (≤200 ms) / force cancel, and
+  a one-shot completion `Notify`. Spec §5.7.
+- Pattern generators: `thinking` (radial pulse), `needs_input`
+  (3-stage flash + breathing + counter-rhythm accents, spec §5.4
+  acceptance criterion encoded in tests), `idle` (deep ember breathing),
+  `complete` (sweep + asterisk + fade, spec §5.5 asterisk mask),
+  `error` (burnt-rust slow breathing).
+- `signal_thinking` / `signal_needs_input` / `signal_idle` /
+  `signal_complete` / `signal_error` high-level MCP tools.
+- Low-level MCP surface completed: `set_static_color`, `set_custom_grid`,
+  `play_preset_effect`, `clear_device`, `clear_all`, `get_device_info`,
+  `get_session_status` — 12 tools total.
+- Idle auto-entry (spec §5.9) with `RAZER_CHROMA_IDLE_MS` env override
+  (default 10 min) and the UserControlled / Error eligibility rule.
+- Reconnect restores the previous persistent state (or replays the
+  cached user frame when UserControlled). Spec §5.8.
 
 ### Changed
 - MSRV bumped 1.75 → 1.85 to adopt `rmcp` 1.5 (Rust edition 2024).
+- MCP handlers retargeted from `Controller` to `StatefulController`,
+  which owns the ClaudeState machine, animator lifecycle, inactivity
+  timer, and reconnect-restore watcher.
 
 ### Fixed
 - `heartbeat` PUT now sends an empty JSON body; Synapse's Chroma REST
