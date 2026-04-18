@@ -18,3 +18,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Session` lifecycle: 5s heartbeat, 3-fail reconnect threshold, graceful shutdown.
 - Effect payloads (`CHROMA_NONE`/`CHROMA_STATIC`/`CHROMA_CUSTOM`/`CHROMA_BREATHING`/`CHROMA_WAVE`/`CHROMA_REACTIVE`/`CHROMA_SPECTRUMCYCLING`) with insta snapshot tests.
 - `demo` subcommand — 3-second terracotta sweep on keyboard (live hardware verified).
+
+### Changed
+- MSRV bumped 1.75 → 1.85 to adopt `rmcp` 1.5 (Rust edition 2024).
