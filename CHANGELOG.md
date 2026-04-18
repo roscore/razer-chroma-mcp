@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-04-18
+
+First public release. Feature-complete for the v0.1.0 success criteria
+(spec §16): a non-technical Windows user can install via Setup.exe and
+see Claude's signals on their Razer keyboard without touching a terminal.
+
+### Installation UX (M6)
+- NSIS installer (`razer-chroma-mcp-setup-<version>.exe`) — per-user,
+  no UAC, Start Menu shortcut, Apps & Features entry, `EnVar`-based
+  HKCU PATH injection, finish-page auto-launch of the setup wizard.
+- `setup` wizard (spec §7.2): bilingual (KO + EN) walkthrough —
+  Synapse check → Chroma session init → 3-second hardware demo →
+  offer to register with Claude Desktop / Claude Code → final
+  `doctor` run.
+- `uninstall` subcommand (spec §7.5): removes only the `razer-chroma`
+  key from `mcpServers`, preserves every other entry, writes
+  atomically with timestamped backups, warns when Claude Desktop is
+  still running.
+- `config::merge` deep-merge algorithm (spec §7.6) — atomic writes,
+  corrupt-file quarantine, 3-slot backup rotation, idempotent re-runs.
+- Full README with 3-step install, `docs/install.md` (SmartScreen
+  handling), `docs/troubleshooting.md`, `docs/architecture.md`.
+- Release workflow (`.github/workflows/release.yml`) builds the
+  installer on `v*` tag push.
+
 ### Added
 - Cargo project scaffolding (Rust 2021, MSRV 1.75).
 - Module skeleton: `chroma`, `signals`, `mcp`, `cli`, `config`.
