@@ -1,5 +1,6 @@
 //! Claude state machine, animators, and pattern generators. See spec §5.
 
+pub mod animator;
 pub mod controller;
 pub mod inactivity;
 pub mod palette;
