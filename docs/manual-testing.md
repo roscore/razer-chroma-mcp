@@ -93,3 +93,56 @@ out-of-band hardware/IPC runs that cannot be reproduced in CI.
 
 <fill in>
 
+## M5 — Reconnect-restore verification (T5.6)
+
+Exercises `Session::reconnect()` + `StatefulController::restore_after_reconnect()`
+end-to-end. The controller registers a watcher on the session's
+`reconnected: Arc<Notify>` (see `src/chroma/session.rs`,
+`src/signals/controller.rs`) that replays the last persistent state — or the
+last user frame if the snapshot was `UserControlled` — every time reconnect
+succeeds.
+
+**Environment**
+- Host: Windows 11, rustc 1.94.1, `cargo build` debug profile
+- Binary: `target/debug/razer-chroma-mcp.exe`
+- Razer Synapse: running, Chroma SDK module enabled
+- Razer hardware: BlackWidow (6×22 grid)
+- Log tail: `powershell -c "Get-Content -Wait $env:LOCALAPPDATA\razer-chroma-mcp\logs\mcp.log"`
+
+**Forcing a reconnect.** Pick whichever is least invasive; all three route
+through the same code path (`heartbeat` fails → `Reconnecting { failures }`
+→ `reconnect()` → `notify_waiters()`):
+
+- Close + reopen Razer Synapse (Synapse exit → Chroma REST drops → restart
+  Synapse → watcher fires).
+- Disable + re-enable the "Chroma Apps" toggle in Synapse. Faster than a full
+  restart; stays within a single app instance.
+- Temporarily block port 54235 with a firewall rule (`New-NetFirewallRule`
+  then remove). Harshest — forces ≥3 heartbeat failures before reconnect.
+
+**Scenarios**
+
+| # | Pre-state | Action | Expected after reconnect | Pass? | Notes |
+| - | --------- | ------ | ------------------------ | ----- | ----- |
+| R1 | `signal_error` → Error breathing (burnt rust) | Close Synapse, wait until `Reconnecting` appears in logs, reopen Synapse | Error breathing resumes automatically; no manual re-trigger needed | | Error is a persistent state — `last_persistent = Error` |
+| R2 | `signal_idle` → Idle breathing (deep ember) | Same as R1 | Idle breathing resumes | | `last_persistent = Idle` |
+| R3 | `set_static_color #D97757` → UserControlled solid terracotta | Same as R1 | UserControlled frame re-PUT; keyboard fills terracotta again | | Replay path: cached `last_user_frame` |
+| R4 | `signal_complete` just played (→ Off) | Same as R1 | Keyboard stays dark; no spurious pattern | | Off is a no-op branch in `restore_after_reconnect` |
+| R5 | `signal_thinking` running (transient Thinking) | Same as R1 | Restores `last_persistent` (whichever it was — **not** Thinking). If the session started from a clean Off, keyboard stays dark. | | Thinking/NeedsInput/Complete are not persistent |
+
+**What to look for in the logs**
+
+- `heartbeat failure: ...` followed by `reconnect succeeded, session reinitialized`
+  (success path) or `reconnect failed, marking Degraded` (exhausted retries).
+- `restore_after_reconnect` tracing spans with the replayed variant.
+- No `guard_healthy` rejections on the replayed transition (the restore path
+  bypasses the Degraded guard because the session just came back Healthy).
+
+**Observations**
+
+<fill in after run>
+
+**Carryovers**
+
+<fill in>
+
