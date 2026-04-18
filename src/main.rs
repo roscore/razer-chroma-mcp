@@ -53,11 +53,16 @@ async fn main() -> Result<()> {
 fn init_tracing() {
     use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
-    let filter = EnvFilter::try_from_env("RAZER_CHROMA_LOG").unwrap_or_else(|_| EnvFilter::new("info"));
+    let filter =
+        EnvFilter::try_from_env("RAZER_CHROMA_LOG").unwrap_or_else(|_| EnvFilter::new("info"));
 
     // File appender at %LOCALAPPDATA%\razer-chroma-mcp\logs\mcp.log (daily rotation, 7-day retention).
     let log_dir = std::env::var("LOCALAPPDATA")
-        .map(|p| std::path::PathBuf::from(p).join("razer-chroma-mcp").join("logs"))
+        .map(|p| {
+            std::path::PathBuf::from(p)
+                .join("razer-chroma-mcp")
+                .join("logs")
+        })
         .unwrap_or_else(|_| std::path::PathBuf::from("./logs"));
     let _ = std::fs::create_dir_all(&log_dir);
     prune_old_logs(&log_dir);

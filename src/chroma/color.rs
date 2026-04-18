@@ -19,15 +19,24 @@ impl Rgb {
     /// Parse a hex color string like `#RRGGBB` or `#RGB`. Leading `#` is required.
     pub fn from_hex(s: &str) -> Result<Self> {
         let s = s.trim();
-        let body = s.strip_prefix('#')
+        let body = s
+            .strip_prefix('#')
             .ok_or_else(|| ChromaError::InvalidColor(format!("missing leading '#': {s}")))?;
-        let parse_u8 = |slice: &str| u8::from_str_radix(slice, 16)
-            .map_err(|_| ChromaError::InvalidColor(format!("not valid hex: {s}")));
+        let parse_u8 = |slice: &str| {
+            u8::from_str_radix(slice, 16)
+                .map_err(|_| ChromaError::InvalidColor(format!("not valid hex: {s}")))
+        };
         match body.len() {
-            6 => Ok(Self::new(parse_u8(&body[0..2])?, parse_u8(&body[2..4])?, parse_u8(&body[4..6])?)),
+            6 => Ok(Self::new(
+                parse_u8(&body[0..2])?,
+                parse_u8(&body[2..4])?,
+                parse_u8(&body[4..6])?,
+            )),
             3 => {
-                let expand = |c: char| u8::from_str_radix(&format!("{c}{c}"), 16)
-                    .map_err(|_| ChromaError::InvalidColor(format!("not valid hex: {s}")));
+                let expand = |c: char| {
+                    u8::from_str_radix(&format!("{c}{c}"), 16)
+                        .map_err(|_| ChromaError::InvalidColor(format!("not valid hex: {s}")))
+                };
                 let mut chars = body.chars();
                 Ok(Self::new(
                     expand(chars.next().unwrap())?,
@@ -35,7 +44,9 @@ impl Rgb {
                     expand(chars.next().unwrap())?,
                 ))
             }
-            _ => Err(ChromaError::InvalidColor(format!("length must be 3 or 6 hex digits: {s}"))),
+            _ => Err(ChromaError::InvalidColor(format!(
+                "length must be 3 or 6 hex digits: {s}"
+            ))),
         }
     }
 
@@ -45,7 +56,11 @@ impl Rgb {
     }
 
     pub const fn from_bgr_u32(v: u32) -> Self {
-        Self::new((v & 0xFF) as u8, ((v >> 8) & 0xFF) as u8, ((v >> 16) & 0xFF) as u8)
+        Self::new(
+            (v & 0xFF) as u8,
+            ((v >> 8) & 0xFF) as u8,
+            ((v >> 16) & 0xFF) as u8,
+        )
     }
 }
 
@@ -55,7 +70,10 @@ mod tests {
 
     #[test]
     fn parses_long_hex() {
-        assert_eq!(Rgb::from_hex("#D97757").unwrap(), Rgb::new(0xD9, 0x77, 0x57));
+        assert_eq!(
+            Rgb::from_hex("#D97757").unwrap(),
+            Rgb::new(0xD9, 0x77, 0x57)
+        );
     }
 
     #[test]
@@ -65,22 +83,34 @@ mod tests {
 
     #[test]
     fn rejects_missing_hash() {
-        assert!(matches!(Rgb::from_hex("D97757"), Err(ChromaError::InvalidColor(_))));
+        assert!(matches!(
+            Rgb::from_hex("D97757"),
+            Err(ChromaError::InvalidColor(_))
+        ));
     }
 
     #[test]
     fn rejects_bad_length() {
-        assert!(matches!(Rgb::from_hex("#D977"), Err(ChromaError::InvalidColor(_))));
+        assert!(matches!(
+            Rgb::from_hex("#D977"),
+            Err(ChromaError::InvalidColor(_))
+        ));
     }
 
     #[test]
     fn rejects_non_hex_chars() {
-        assert!(matches!(Rgb::from_hex("#GGGGGG"), Err(ChromaError::InvalidColor(_))));
+        assert!(matches!(
+            Rgb::from_hex("#GGGGGG"),
+            Err(ChromaError::InvalidColor(_))
+        ));
     }
 
     #[test]
     fn parses_case_insensitive() {
-        assert_eq!(Rgb::from_hex("#d97757").unwrap(), Rgb::from_hex("#D97757").unwrap());
+        assert_eq!(
+            Rgb::from_hex("#d97757").unwrap(),
+            Rgb::from_hex("#D97757").unwrap()
+        );
     }
 
     #[test]

@@ -130,7 +130,10 @@ fn sibling_with_suffix(path: &Path, suffix: &str) -> PathBuf {
     // `{filename}.bak-`). We want to *append* a new extension instead, so the
     // result is `c.json.bak-123`.
     let parent = path.parent().unwrap_or(Path::new("."));
-    let stem = path.file_name().map(|s| s.to_os_string()).unwrap_or_default();
+    let stem = path
+        .file_name()
+        .map(|s| s.to_os_string())
+        .unwrap_or_default();
     let mut name = stem;
     name.push(".");
     name.push(suffix);
@@ -195,8 +198,8 @@ fn atomic_write(path: &Path, value: &Value) -> Result<()> {
         path.file_name().and_then(|s| s.to_str()).unwrap_or("cfg"),
         std::process::id()
     ));
-    let text =
-        serde_json::to_string_pretty(value).map_err(|e| ChromaError::SessionInitFailed(e.to_string()))?;
+    let text = serde_json::to_string_pretty(value)
+        .map_err(|e| ChromaError::SessionInitFailed(e.to_string()))?;
     fs::write(&tmp, &text).map_err(|e| ChromaError::SessionInitFailed(e.to_string()))?;
     // fsync — best-effort on Windows; rename is the actual atomic boundary.
     if let Ok(f) = fs::File::open(&tmp) {
@@ -265,9 +268,12 @@ mod tests {
         let tmp = tempdir().unwrap();
         let (_, r) = run(tmp.path(), "c.json", Some("{ not valid"));
         assert!(matches!(r, Err(ChromaError::ConfigCorrupt { .. })));
-        assert!(fs::read_dir(tmp.path())
-            .unwrap()
-            .any(|e| { e.unwrap().file_name().to_string_lossy().contains("corrupt-") }));
+        assert!(fs::read_dir(tmp.path()).unwrap().any(|e| {
+            e.unwrap()
+                .file_name()
+                .to_string_lossy()
+                .contains("corrupt-")
+        }));
     }
 
     #[test]
@@ -305,7 +311,8 @@ mod tests {
     #[test]
     fn replaces_existing_entry_with_different_values() {
         let tmp = tempdir().unwrap();
-        let init = r#"{ "mcpServers": { "razer-chroma": { "command": "old.exe", "args": ["serve"] } } }"#;
+        let init =
+            r#"{ "mcpServers": { "razer-chroma": { "command": "old.exe", "args": ["serve"] } } }"#;
         let (p, r) = run(tmp.path(), "c.json", Some(init));
         assert_eq!(r.unwrap(), MergeOutcome::Replaced);
         let v: Value = serde_json::from_str(&fs::read_to_string(&p).unwrap()).unwrap();
@@ -323,8 +330,7 @@ mod tests {
         // Run merge 5 times, each with a slightly different binary path so
         // it's never idempotent.
         for i in 0..5 {
-            let bin_i =
-                PathBuf::from(format!(r"C:\Users\tester\razer-chroma-mcp-{i}.exe"));
+            let bin_i = PathBuf::from(format!(r"C:\Users\tester\razer-chroma-mcp-{i}.exe"));
             let input = MergeInput {
                 path: &p,
                 binary_path: &bin_i,

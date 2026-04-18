@@ -36,7 +36,8 @@ pub async fn run() -> Result<()> {
 
         while Instant::now().duration_since(start) < total {
             tick.tick().await;
-            let t = Instant::now().duration_since(start).as_millis() as f32 / total.as_millis() as f32;
+            let t =
+                Instant::now().duration_since(start).as_millis() as f32 / total.as_millis() as f32;
             let leading_col = (t * (KEYBOARD_COLS as f32 + 4.0)) as i32 - 2;
             let grid = sweep_frame(leading_col);
             session

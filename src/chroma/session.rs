@@ -177,7 +177,10 @@ impl Session {
             }
         }
         self.inner.write().await.status = SessionStatus::Degraded;
-        tracing::error!("session marked DEGRADED after {} reinit attempts", self.cfg.reinit_max);
+        tracing::error!(
+            "session marked DEGRADED after {} reinit attempts",
+            self.cfg.reinit_max
+        );
     }
 
     pub async fn shutdown(&self) {
@@ -187,7 +190,10 @@ impl Session {
         }
         let uri = self.uri().await;
         // Best-effort NONE + delete
-        let _ = self.client.put_effect(&uri, "keyboard", &EffectEnvelope::none()).await;
+        let _ = self
+            .client
+            .put_effect(&uri, "keyboard", &EffectEnvelope::none())
+            .await;
         let _ = self.client.delete_session(&uri).await;
         self.inner.write().await.status = SessionStatus::ShutDown;
     }

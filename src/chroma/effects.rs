@@ -15,7 +15,10 @@ pub struct EffectEnvelope {
 
 impl EffectEnvelope {
     pub fn none() -> Self {
-        Self { effect: "CHROMA_NONE", param: None }
+        Self {
+            effect: "CHROMA_NONE",
+            param: None,
+        }
     }
 
     pub fn r#static(color: Rgb) -> Self {
@@ -34,14 +37,21 @@ impl EffectEnvelope {
             effect: "CHROMA_CUSTOM",
             param: Some(serde_json::Value::Array(
                 rows.into_iter()
-                    .map(|r| serde_json::Value::Array(r.into_iter().map(|v| serde_json::json!(v)).collect()))
+                    .map(|r| {
+                        serde_json::Value::Array(
+                            r.into_iter().map(|v| serde_json::json!(v)).collect(),
+                        )
+                    })
                     .collect(),
             )),
         }
     }
 
     pub fn spectrumcycling() -> Self {
-        Self { effect: "CHROMA_SPECTRUMCYCLING", param: None }
+        Self {
+            effect: "CHROMA_SPECTRUMCYCLING",
+            param: None,
+        }
     }
 
     pub fn wave(direction: WaveDirection) -> Self {
@@ -59,7 +69,10 @@ impl EffectEnvelope {
                 "type": 3, "color1": a.to_bgr_u32(), "color2": b.to_bgr_u32()
             }),
         };
-        Self { effect: "CHROMA_BREATHING", param: Some(v) }
+        Self {
+            effect: "CHROMA_BREATHING",
+            param: Some(v),
+        }
     }
 
     pub fn reactive(color: Rgb, duration: ReactiveDuration) -> Self {
@@ -75,7 +88,10 @@ impl EffectEnvelope {
 
 #[derive(Clone, Copy, Debug)]
 #[repr(u8)]
-pub enum WaveDirection { LeftToRight = 1, RightToLeft = 2 }
+pub enum WaveDirection {
+    LeftToRight = 1,
+    RightToLeft = 2,
+}
 
 #[derive(Clone, Copy, Debug)]
 pub enum BreathingKind {
@@ -86,7 +102,11 @@ pub enum BreathingKind {
 
 #[derive(Clone, Copy, Debug)]
 #[repr(u8)]
-pub enum ReactiveDuration { Short = 1, Medium = 2, Long = 3 }
+pub enum ReactiveDuration {
+    Short = 1,
+    Medium = 2,
+    Long = 3,
+}
 
 /// Build a full-keyboard custom grid from a single color.
 pub fn keyboard_uniform(color: Rgb) -> [[Rgb; KEYBOARD_COLS]; KEYBOARD_ROWS] {
@@ -97,7 +117,10 @@ pub fn keyboard_uniform(color: Rgb) -> [[Rgb; KEYBOARD_COLS]; KEYBOARD_ROWS] {
 pub fn validate_grid(device: Device, rows: usize, cols: usize) -> Result<()> {
     if let Some(expected) = device.grid() {
         if expected != (rows, cols) {
-            return Err(ChromaError::InvalidGridSize { expected, actual: (rows, cols) });
+            return Err(ChromaError::InvalidGridSize {
+                expected,
+                actual: (rows, cols),
+            });
         }
     }
     Ok(())

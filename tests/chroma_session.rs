@@ -49,7 +49,10 @@ async fn heartbeat_loop_retries_and_reconnects_after_three_failures() {
 
     // Give the heartbeat loop time to fail 3× and trigger reconnect attempt.
     tokio::time::sleep(Duration::from_millis(300)).await;
-    assert!(hb_calls.load(Ordering::SeqCst) >= 3, "heartbeat should have been attempted at least 3 times");
+    assert!(
+        hb_calls.load(Ordering::SeqCst) >= 3,
+        "heartbeat should have been attempted at least 3 times"
+    );
 
     session.shutdown().await;
 }

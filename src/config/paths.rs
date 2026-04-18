@@ -5,9 +5,11 @@
 use std::path::PathBuf;
 
 pub fn claude_desktop_config() -> Option<PathBuf> {
-    std::env::var("APPDATA")
-        .ok()
-        .map(|p| PathBuf::from(p).join("Claude").join("claude_desktop_config.json"))
+    std::env::var("APPDATA").ok().map(|p| {
+        PathBuf::from(p)
+            .join("Claude")
+            .join("claude_desktop_config.json")
+    })
 }
 
 pub fn claude_code_config() -> Option<PathBuf> {

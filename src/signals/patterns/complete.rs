@@ -127,7 +127,10 @@ mod tests {
     fn asterisk_has_lit_center_ray() {
         // Row 3 (mid) should have the horizontal ray of the asterisk lit.
         let count: u8 = ASTERISK[3].iter().sum();
-        assert!(count >= 4, "center row should have ≥4 lit keys, got {count}");
+        assert!(
+            count >= 4,
+            "center row should have ≥4 lit keys, got {count}"
+        );
     }
 
     #[test]

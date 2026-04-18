@@ -76,7 +76,9 @@ pub struct StatusOutput {
 
 impl StatusOutput {
     fn ok() -> Self {
-        Self { status: "ok".to_string() }
+        Self {
+            status: "ok".to_string(),
+        }
     }
 }
 
@@ -88,7 +90,10 @@ pub struct SignalStatusOutput {
 
 impl SignalStatusOutput {
     fn ok(state: &str) -> Self {
-        Self { status: "ok".to_string(), state: state.to_string() }
+        Self {
+            status: "ok".to_string(),
+            state: state.to_string(),
+        }
     }
 }
 
@@ -118,10 +123,7 @@ pub async fn set_static_color(
     Ok(StatusOutput::ok())
 }
 
-pub async fn set_custom_grid(
-    c: &StatefulController,
-    a: SetCustomGridArgs,
-) -> Result<StatusOutput> {
+pub async fn set_custom_grid(c: &StatefulController, a: SetCustomGridArgs) -> Result<StatusOutput> {
     if a.grid.len() != KEYBOARD_ROWS {
         return Err(anyhow!("grid must have {} rows", KEYBOARD_ROWS));
     }
@@ -140,10 +142,7 @@ pub async fn set_custom_grid(
     Ok(StatusOutput::ok())
 }
 
-pub async fn play_preset_effect(
-    c: &StatefulController,
-    a: PlayPresetArgs,
-) -> Result<StatusOutput> {
+pub async fn play_preset_effect(c: &StatefulController, a: PlayPresetArgs) -> Result<StatusOutput> {
     let effect = match a.effect_type.to_ascii_uppercase().as_str() {
         "WAVE" => {
             let dir = a
@@ -192,10 +191,7 @@ pub async fn play_preset_effect(
     Ok(StatusOutput::ok())
 }
 
-pub async fn clear_device(
-    c: &StatefulController,
-    a: ClearDeviceArgs,
-) -> Result<StatusOutput> {
+pub async fn clear_device(c: &StatefulController, a: ClearDeviceArgs) -> Result<StatusOutput> {
     let device = Device::parse(&a.device).map_err(|e| anyhow!(e))?;
     let session = c.session().await.map_err(|e| anyhow!(e))?;
     session
@@ -210,7 +206,14 @@ pub async fn clear_all(c: &StatefulController) -> Result<StatusOutput> {
         .await
         .map_err(|e| anyhow!(e))?;
     if let Ok(session) = c.session().await {
-        for device in ["keyboard", "mouse", "mousepad", "headset", "keypad", "chromalink"] {
+        for device in [
+            "keyboard",
+            "mouse",
+            "mousepad",
+            "headset",
+            "keypad",
+            "chromalink",
+        ] {
             let _ = session.put_effect(device, &EffectEnvelope::none()).await;
         }
     }
@@ -243,12 +246,16 @@ pub async fn get_session_status(c: &StatefulController) -> SessionStatusOutput {
 // ── High-level signal_* handlers ─────────────────────────────────────────────
 
 pub async fn signal_thinking(c: &StatefulController) -> Result<SignalStatusOutput> {
-    c.transition(Incoming::Thinking).await.map_err(|e| anyhow!(e))?;
+    c.transition(Incoming::Thinking)
+        .await
+        .map_err(|e| anyhow!(e))?;
     Ok(SignalStatusOutput::ok("Thinking"))
 }
 
 pub async fn signal_needs_input(c: &StatefulController) -> Result<SignalStatusOutput> {
-    c.transition(Incoming::NeedsInput).await.map_err(|e| anyhow!(e))?;
+    c.transition(Incoming::NeedsInput)
+        .await
+        .map_err(|e| anyhow!(e))?;
     Ok(SignalStatusOutput::ok("NeedsInput"))
 }
 
@@ -258,7 +265,9 @@ pub async fn signal_idle(c: &StatefulController) -> Result<SignalStatusOutput> {
 }
 
 pub async fn signal_complete(c: &StatefulController) -> Result<SignalStatusOutput> {
-    c.transition(Incoming::Complete).await.map_err(|e| anyhow!(e))?;
+    c.transition(Incoming::Complete)
+        .await
+        .map_err(|e| anyhow!(e))?;
     Ok(SignalStatusOutput::ok("Complete"))
 }
 
@@ -269,7 +278,9 @@ pub async fn signal_error(
     if let Some(m) = &a.message {
         tracing::warn!(target: "claude_signal", "signal_error: {m}");
     }
-    c.transition(Incoming::Error).await.map_err(|e| anyhow!(e))?;
+    c.transition(Incoming::Error)
+        .await
+        .map_err(|e| anyhow!(e))?;
     Ok(SignalStatusOutput::ok("Error"))
 }
 

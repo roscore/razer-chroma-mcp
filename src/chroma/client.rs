@@ -50,8 +50,8 @@ pub struct ChromaClient {
 
 impl Default for ChromaClient {
     fn default() -> Self {
-        let base = std::env::var("RAZER_CHROMA_BASE_URL")
-            .unwrap_or_else(|_| DEFAULT_BASE.to_string());
+        let base =
+            std::env::var("RAZER_CHROMA_BASE_URL").unwrap_or_else(|_| DEFAULT_BASE.to_string());
         Self::with_base_url(&base)
     }
 }
@@ -172,9 +172,15 @@ mod tests {
     async fn connection_refused_maps_to_synapse_not_running() {
         // Port 1 is reserved and will refuse connection on most systems.
         let client = ChromaClient::with_base_url("http://127.0.0.1:1");
-        let err = client.init_session(serde_json::json!({})).await.unwrap_err();
+        let err = client
+            .init_session(serde_json::json!({}))
+            .await
+            .unwrap_err();
         assert!(
-            matches!(err, ChromaError::SynapseNotRunning | ChromaError::Network(_)),
+            matches!(
+                err,
+                ChromaError::SynapseNotRunning | ChromaError::Network(_)
+            ),
             "got: {err:?}"
         );
     }

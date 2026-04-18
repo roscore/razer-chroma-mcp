@@ -76,7 +76,10 @@ mod tests {
 
     #[test]
     fn parse_rejects_unknown() {
-        assert!(matches!(Device::parse("gpu"), Err(ChromaError::UnknownDevice(_))));
+        assert!(matches!(
+            Device::parse("gpu"),
+            Err(ChromaError::UnknownDevice(_))
+        ));
     }
 
     #[test]

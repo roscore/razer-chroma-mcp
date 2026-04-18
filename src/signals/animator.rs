@@ -80,7 +80,11 @@ pub fn spawn<P: Pattern>(session: Session, mut pattern: P) -> AnimatorHandle {
             }
         }
     });
-    AnimatorHandle { cancel, join, finished }
+    AnimatorHandle {
+        cancel,
+        join,
+        finished,
+    }
 }
 
 /// No-op animator — used when the state has no animation (e.g., `UserControlled`

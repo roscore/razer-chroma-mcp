@@ -131,8 +131,14 @@ mod tests {
                 saw_on_off_on = true;
             }
         }
-        assert!(flash_frames >= 3, "need at least 3 lit frames, got {flash_frames}");
-        assert!(saw_on_off_on, "need at least 3 distinct flashes (≥5 on↔off transitions)");
+        assert!(
+            flash_frames >= 3,
+            "need at least 3 lit frames, got {flash_frames}"
+        );
+        assert!(
+            saw_on_off_on,
+            "need at least 3 distinct flashes (≥5 on↔off transitions)"
+        );
     }
 
     #[test]
@@ -154,7 +160,11 @@ mod tests {
             min_b = min_b.min(b);
             max_b = max_b.max(b);
         }
-        assert!(max_b - min_b >= 0.40, "breathing amplitude {} < 40%", max_b - min_b);
+        assert!(
+            max_b - min_b >= 0.40,
+            "breathing amplitude {} < 40%",
+            max_b - min_b
+        );
     }
 
     #[test]
@@ -164,6 +174,9 @@ mod tests {
         let frame = NeedsInputPattern::frame(tick);
         let body = frame[2][10];
         let spacebar = frame[SPACEBAR_ROW][8];
-        assert_ne!(body, spacebar, "spacebar should differ from body during stage 2+3");
+        assert_ne!(
+            body, spacebar,
+            "spacebar should differ from body during stage 2+3"
+        );
     }
 }

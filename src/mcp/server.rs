@@ -48,51 +48,65 @@ fn internal<E: std::fmt::Display>(e: E) -> ErrorData {
 impl RazerChromaServer {
     // ── Low-level tools ──────────────────────────────────────────────────────
 
-    #[tool(description = "Set a single solid color on the keyboard. Accepts hex strings (#RRGGBB / #RGB) or an {r,g,b} object with 0..=255 components.")]
+    #[tool(
+        description = "Set a single solid color on the keyboard. Accepts hex strings (#RRGGBB / #RGB) or an {r,g,b} object with 0..=255 components."
+    )]
     pub async fn set_static_color(
         &self,
-        #[allow(clippy::needless_pass_by_value)]
-        Parameters(args): Parameters<SetStaticColorArgs>,
+        #[allow(clippy::needless_pass_by_value)] Parameters(args): Parameters<SetStaticColorArgs>,
     ) -> Result<Json<StatusOutput>, ErrorData> {
         Ok(Json(
-            tools::set_static_color(&self.ctrl, args).await.map_err(internal)?,
+            tools::set_static_color(&self.ctrl, args)
+                .await
+                .map_err(internal)?,
         ))
     }
 
-    #[tool(description = "Set a 6x22 custom color grid on the keyboard. `grid` is a 6-row array of 22-element rows, each element either a hex string or {r,g,b} object.")]
+    #[tool(
+        description = "Set a 6x22 custom color grid on the keyboard. `grid` is a 6-row array of 22-element rows, each element either a hex string or {r,g,b} object."
+    )]
     pub async fn set_custom_grid(
         &self,
-        #[allow(clippy::needless_pass_by_value)]
-        Parameters(args): Parameters<SetCustomGridArgs>,
+        #[allow(clippy::needless_pass_by_value)] Parameters(args): Parameters<SetCustomGridArgs>,
     ) -> Result<Json<StatusOutput>, ErrorData> {
         Ok(Json(
-            tools::set_custom_grid(&self.ctrl, args).await.map_err(internal)?,
+            tools::set_custom_grid(&self.ctrl, args)
+                .await
+                .map_err(internal)?,
         ))
     }
 
-    #[tool(description = "Play a built-in Chroma preset effect. effect_type: WAVE | SPECTRUMCYCLING | BREATHING | REACTIVE. See spec §6.3 for params.")]
+    #[tool(
+        description = "Play a built-in Chroma preset effect. effect_type: WAVE | SPECTRUMCYCLING | BREATHING | REACTIVE. See spec §6.3 for params."
+    )]
     pub async fn play_preset_effect(
         &self,
-        #[allow(clippy::needless_pass_by_value)]
-        Parameters(args): Parameters<PlayPresetArgs>,
+        #[allow(clippy::needless_pass_by_value)] Parameters(args): Parameters<PlayPresetArgs>,
     ) -> Result<Json<StatusOutput>, ErrorData> {
         Ok(Json(
-            tools::play_preset_effect(&self.ctrl, args).await.map_err(internal)?,
+            tools::play_preset_effect(&self.ctrl, args)
+                .await
+                .map_err(internal)?,
         ))
     }
 
-    #[tool(description = "Release a single device back to system control (sends Chroma NONE to the given device path).")]
+    #[tool(
+        description = "Release a single device back to system control (sends Chroma NONE to the given device path)."
+    )]
     pub async fn clear_device(
         &self,
-        #[allow(clippy::needless_pass_by_value)]
-        Parameters(args): Parameters<ClearDeviceArgs>,
+        #[allow(clippy::needless_pass_by_value)] Parameters(args): Parameters<ClearDeviceArgs>,
     ) -> Result<Json<StatusOutput>, ErrorData> {
         Ok(Json(
-            tools::clear_device(&self.ctrl, args).await.map_err(internal)?,
+            tools::clear_device(&self.ctrl, args)
+                .await
+                .map_err(internal)?,
         ))
     }
 
-    #[tool(description = "Release all devices back to system control and drop the current Claude state (Off).")]
+    #[tool(
+        description = "Release all devices back to system control and drop the current Claude state (Off)."
+    )]
     pub async fn clear_all(
         &self,
         #[allow(clippy::needless_pass_by_value)] Parameters(_): Parameters<EmptyArgs>,
@@ -100,7 +114,9 @@ impl RazerChromaServer {
         Ok(Json(tools::clear_all(&self.ctrl).await.map_err(internal)?))
     }
 
-    #[tool(description = "Return static device catalog: grid dimensions for keyboard/mouse/keypad and LED counts for strip devices.")]
+    #[tool(
+        description = "Return static device catalog: grid dimensions for keyboard/mouse/keypad and LED counts for strip devices."
+    )]
     pub async fn get_device_info(
         &self,
         #[allow(clippy::needless_pass_by_value)] Parameters(_): Parameters<EmptyArgs>,
@@ -108,7 +124,9 @@ impl RazerChromaServer {
         Ok(Json(tools::get_device_info().await))
     }
 
-    #[tool(description = "Return the current Chroma session state and ClaudeState (initialized flag + debug strings).")]
+    #[tool(
+        description = "Return the current Chroma session state and ClaudeState (initialized flag + debug strings)."
+    )]
     pub async fn get_session_status(
         &self,
         #[allow(clippy::needless_pass_by_value)] Parameters(_): Parameters<EmptyArgs>,
@@ -128,13 +146,17 @@ impl RazerChromaServer {
         ))
     }
 
-    #[tool(description = "Signal that Claude needs user input (3-stage attention-grabber). See spec §5.4.")]
+    #[tool(
+        description = "Signal that Claude needs user input (3-stage attention-grabber). See spec §5.4."
+    )]
     pub async fn signal_needs_input(
         &self,
         #[allow(clippy::needless_pass_by_value)] Parameters(_): Parameters<EmptyArgs>,
     ) -> Result<Json<SignalStatusOutput>, ErrorData> {
         Ok(Json(
-            tools::signal_needs_input(&self.ctrl).await.map_err(internal)?,
+            tools::signal_needs_input(&self.ctrl)
+                .await
+                .map_err(internal)?,
         ))
     }
 
@@ -143,10 +165,14 @@ impl RazerChromaServer {
         &self,
         #[allow(clippy::needless_pass_by_value)] Parameters(_): Parameters<EmptyArgs>,
     ) -> Result<Json<SignalStatusOutput>, ErrorData> {
-        Ok(Json(tools::signal_idle(&self.ctrl).await.map_err(internal)?))
+        Ok(Json(
+            tools::signal_idle(&self.ctrl).await.map_err(internal)?,
+        ))
     }
 
-    #[tool(description = "Signal that Claude completed a task (1.8s sweep+asterisk one-shot, then restores previous state).")]
+    #[tool(
+        description = "Signal that Claude completed a task (1.8s sweep+asterisk one-shot, then restores previous state)."
+    )]
     pub async fn signal_complete(
         &self,
         #[allow(clippy::needless_pass_by_value)] Parameters(_): Parameters<EmptyArgs>,
@@ -156,14 +182,17 @@ impl RazerChromaServer {
         ))
     }
 
-    #[tool(description = "Signal that Claude hit an error (burnt-rust slow breathing). Optional `message` is logged to the tracing warn channel.")]
+    #[tool(
+        description = "Signal that Claude hit an error (burnt-rust slow breathing). Optional `message` is logged to the tracing warn channel."
+    )]
     pub async fn signal_error(
         &self,
-        #[allow(clippy::needless_pass_by_value)]
-        Parameters(args): Parameters<SignalErrorArgs>,
+        #[allow(clippy::needless_pass_by_value)] Parameters(args): Parameters<SignalErrorArgs>,
     ) -> Result<Json<SignalStatusOutput>, ErrorData> {
         Ok(Json(
-            tools::signal_error(&self.ctrl, args).await.map_err(internal)?,
+            tools::signal_error(&self.ctrl, args)
+                .await
+                .map_err(internal)?,
         ))
     }
 }

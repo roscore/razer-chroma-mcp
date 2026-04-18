@@ -24,7 +24,10 @@ async fn send<W: AsyncWriteExt + Unpin>(w: &mut W, msg: Value) {
 async fn recv<R: tokio::io::AsyncRead + Unpin>(r: &mut BufReader<R>) -> Value {
     let mut line = String::new();
     r.read_line(&mut line).await.unwrap();
-    assert!(!line.is_empty(), "server closed stdout before sending a frame");
+    assert!(
+        !line.is_empty(),
+        "server closed stdout before sending a frame"
+    );
     serde_json::from_str(line.trim_end()).expect("server returned invalid JSON line")
 }
 

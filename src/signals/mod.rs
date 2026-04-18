@@ -26,7 +26,9 @@ pub enum ClaudeState {
     Thinking,
     NeedsInput,
     /// One-shot. On completion, controller restores `previous`.
-    Complete { previous: PersistentState },
+    Complete {
+        previous: PersistentState,
+    },
     Error,
 }
 
@@ -72,7 +74,9 @@ mod tests {
 
     #[test]
     fn as_persistent_returns_none_for_complete() {
-        let s = ClaudeState::Complete { previous: PersistentState::Thinking };
+        let s = ClaudeState::Complete {
+            previous: PersistentState::Thinking,
+        };
         assert!(s.as_persistent().is_none());
     }
 
