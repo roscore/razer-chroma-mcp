@@ -1,11 +1,12 @@
-//! `serve` subcommand — run the MCP stdio server with the shared Controller.
+//! `serve` subcommand — run the MCP stdio server with a `StatefulController`.
 
 use crate::mcp::server;
-use crate::signals::controller::Controller;
+use crate::signals::controller::StatefulController;
 use anyhow::Result;
 
 pub async fn run() -> Result<()> {
-    let controller = Controller::default();
+    let controller = StatefulController::default();
+    controller.start_idle_watcher().await;
 
     // Graceful shutdown on Ctrl+C / stdio EOF (EOF is handled inside the transport).
     let ctrl_for_shutdown = controller.clone();

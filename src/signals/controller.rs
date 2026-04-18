@@ -276,6 +276,15 @@ impl StatefulController {
         self.inner.lock().await.state
     }
 
+    /// Returns the Chroma session status without forcing initialization.
+    /// Used by `get_session_status` MCP tool.
+    pub async fn session_status(&self) -> SessionStatus {
+        match self.session.get() {
+            Some(s) => s.status().await,
+            None => SessionStatus::Uninitialized,
+        }
+    }
+
     /// Transition to the state produced by applying `incoming` to the current state.
     /// Cancels the current animator gracefully (≤200ms) before spawning the new one.
     pub async fn transition(&self, incoming: Incoming) -> Result<ClaudeState> {
