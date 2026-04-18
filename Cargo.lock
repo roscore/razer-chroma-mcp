@@ -1153,6 +1153,7 @@ dependencies = [
  "insta",
  "reqwest",
  "rmcp",
+ "schemars",
  "serde",
  "serde_json",
  "tempfile",

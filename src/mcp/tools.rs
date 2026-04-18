@@ -4,15 +4,16 @@
 use crate::chroma::color::Rgb;
 use crate::signals::controller::Controller;
 use anyhow::{anyhow, Result};
+use schemars::JsonSchema;
 use serde::Deserialize;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, JsonSchema)]
 pub struct SetStaticColorArgs {
     pub device: Option<String>, // reserved — ignored in M3, used from M4
     pub color: ColorInput,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, JsonSchema)]
 #[serde(untagged)]
 pub enum ColorInput {
     Hex(String),
