@@ -216,3 +216,149 @@ impl Controller {
         }
     }
 }
+
+// ──────────────────────────────────────────────────────────────────────────────
+// StatefulController (M4) — owns the ClaudeState machine + animator lifecycle.
+// ──────────────────────────────────────────────────────────────────────────────
+
+use crate::signals::animator::{self, AnimatorHandle};
+use std::future::Future;
+use std::pin::Pin;
+use tokio::sync::Mutex;
+
+pub struct ControllerInner {
+    pub state: ClaudeState,
+    pub animator: Option<AnimatorHandle>,
+    /// Last user frame for `UserControlled` restore-on-reconnect (spec §5.8).
+    pub last_user_frame: Option<EffectEnvelope>,
+}
+
+impl Default for ControllerInner {
+    fn default() -> Self {
+        Self {
+            state: ClaudeState::Off,
+            animator: None,
+            last_user_frame: None,
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct StatefulController {
+    client: ChromaClient,
+    session: Arc<OnceCell<Session>>,
+    pub inner: Arc<Mutex<ControllerInner>>,
+}
+
+impl Default for StatefulController {
+    fn default() -> Self {
+        Self {
+            client: ChromaClient::default(),
+            session: Arc::new(OnceCell::new()),
+            inner: Arc::new(Mutex::new(ControllerInner::default())),
+        }
+    }
+}
+
+impl StatefulController {
+    pub async fn session(&self) -> Result<Session> {
+        let s = self
+            .session
+            .get_or_try_init(|| Session::init(self.client.clone(), SessionConfig::default()))
+            .await?;
+        Ok(s.clone())
+    }
+
+    pub async fn current_state(&self) -> ClaudeState {
+        self.inner.lock().await.state
+    }
+
+    /// Transition to the state produced by applying `incoming` to the current state.
+    /// Cancels the current animator gracefully (≤200ms) before spawning the new one.
+    pub async fn transition(&self, incoming: Incoming) -> Result<ClaudeState> {
+        let next = {
+            let mut g = self.inner.lock().await;
+            let next = next_state(g.state, incoming);
+            g.state = next;
+            next
+        };
+        self.swap_animator_for(next).await?;
+        Ok(next)
+    }
+
+    /// Internal: spawn the appropriate animator for `state`. Caller holds no lock.
+    ///
+    /// Returned as a boxed future so the recursive type `swap_animator_for ->
+    /// tokio::spawn -> force_transition -> swap_animator_for` stays `Send` —
+    /// without the `dyn` erasure the compiler can't close the type cycle.
+    fn swap_animator_for<'a>(
+        &'a self,
+        state: ClaudeState,
+    ) -> Pin<Box<dyn Future<Output = Result<()>> + Send + 'a>> {
+        Box::pin(async move {
+            // Graceful-cancel the outgoing animator (lock briefly to take the handle).
+            let old = { self.inner.lock().await.animator.take() };
+            if let Some(h) = old {
+                h.cancel_graceful().await;
+            }
+
+            let session = self.session().await?;
+            let handle = self.spawn_for_state(session, state);
+
+            // If state is Complete, spawn a task that awaits the animator's `finished`
+            // Notify and synthesizes the auto-transition back to `previous`.
+            if let (ClaudeState::Complete { previous }, Some(h)) = (state, handle.as_ref()) {
+                let finished = h.finished.clone();
+                let me = self.clone();
+                tokio::spawn(async move {
+                    finished.notified().await;
+                    let _ = me.force_transition(ClaudeState::from(previous)).await;
+                });
+            }
+
+            self.inner.lock().await.animator = handle;
+            Ok(())
+        })
+    }
+
+    /// Bypass the transition table (used by animator-complete restore and reconnect).
+    pub async fn force_transition(&self, state: ClaudeState) -> Result<ClaudeState> {
+        {
+            let mut g = self.inner.lock().await;
+            g.state = state;
+        }
+        self.swap_animator_for(state).await?;
+        Ok(state)
+    }
+
+    fn spawn_for_state(&self, session: Session, state: ClaudeState) -> Option<AnimatorHandle> {
+        use crate::signals::patterns;
+        match state {
+            ClaudeState::Off | ClaudeState::UserControlled => None,
+            ClaudeState::Idle => Some(animator::spawn(session, patterns::idle::IdlePattern::new())),
+            ClaudeState::Thinking => Some(animator::spawn(session, patterns::thinking::ThinkingPattern::new())),
+            ClaudeState::NeedsInput => Some(animator::spawn(session, patterns::needs_input::NeedsInputPattern::new())),
+            ClaudeState::Complete { .. } => Some(animator::spawn(session, patterns::complete::CompletePattern::new())),
+            ClaudeState::Error => Some(animator::spawn(session, patterns::error::ErrorPattern::new())),
+        }
+    }
+
+    /// Low-level frame write — transitions to `UserControlled` and caches the frame.
+    pub async fn apply_user_frame(&self, effect: EffectEnvelope) -> Result<()> {
+        self.transition(Incoming::LowLevelTool).await?;
+        let session = self.session().await?;
+        session.put_effect("keyboard", &effect).await?;
+        self.inner.lock().await.last_user_frame = Some(effect);
+        Ok(())
+    }
+
+    pub async fn shutdown(&self) {
+        let handle = { self.inner.lock().await.animator.take() };
+        if let Some(h) = handle {
+            h.cancel_force();
+        }
+        if let Some(s) = self.session.get() {
+            s.shutdown().await;
+        }
+    }
+}
