@@ -146,3 +146,33 @@ through the same code path (`heartbeat` fails → `Reconnecting { failures }`
 
 <fill in>
 
+## M6 — Usability gate — YYYY-MM-DD (template, fill at release)
+
+Tester: <name, non-technical>
+Environment: Windows <version>, <hardware>
+Installer version: v0.1.0
+
+Timing:
+
+- Download → Setup.exe launched: <s>
+- Setup.exe clicked → wizard complete: <s>
+- Wizard complete → `signal_thinking` visible: <s>
+- Total: <s>
+
+Tester's words: "<quote>"
+
+Issues encountered: <list, or "none">
+Gate (≤180 s, no help): PASS / FAIL
+
+Follow-ups: <list>
+
+### Recruitment protocol
+
+1. Find one non-technical tester (friend, family member, partner).
+2. Provide only:
+   - Link to the GitHub release page.
+   - One-sentence instruction: "Install this, then ask Claude Desktop to
+     think about something and watch your keyboard."
+3. Do not coach. Time the full run; record their verbatim reaction.
+4. Gate: under 3 minutes, no help needed.
+
