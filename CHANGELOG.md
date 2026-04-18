@@ -49,12 +49,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (default 10 min) and the UserControlled / Error eligibility rule.
 - Reconnect restores the previous persistent state (or replays the
   cached user frame when UserControlled). Spec §5.8.
+- `doctor` subcommand (spec §7.3): 7-check diagnostic — Synapse installed,
+  Synapse running, Chroma REST reachable, Session init, Chroma device
+  detected, Claude Desktop + Claude Code config entries — with
+  per-item fix hints and exit code 2 on any failure.
+- `pattern` subcommand (`thinking` / `needs_input` / `idle` / `complete`
+  / `error`) for standalone previews without Claude Desktop. `--seconds`
+  controls dwell, Ctrl+C interrupts.
+- Startup log prune: files in `%LOCALAPPDATA%\razer-chroma-mcp\logs`
+  older than 7 days are removed on every run so the directory stays
+  bounded without user intervention.
 
 ### Changed
 - MSRV bumped 1.75 → 1.85 to adopt `rmcp` 1.5 (Rust edition 2024).
 - MCP handlers retargeted from `Controller` to `StatefulController`,
   which owns the ClaudeState machine, animator lifecycle, inactivity
   timer, and reconnect-restore watcher.
+- `ChromaClient::init_session` now disambiguates `SynapseNotRunning`
+  vs. `ChromaModuleDisabled` — a 404/503 on the Chroma endpoint while
+  the Synapse root answers 2xx means the module is off, not that
+  Synapse is down.
+- `serve` subcommand shuts the Chroma session down gracefully on
+  stdio EOF (not only on Ctrl+C): the rmcp `.serve()` future returns
+  when the client closes stdin, and we then DELETE the session and
+  wait for the heartbeat task to join before exiting.
+- Every user-facing `ChromaError` variant now carries a bilingual
+  (English + Korean) message. `InvalidColor` and `UnknownDevice`
+  also state the expected format / known device list inline.
+- MCP tool handlers reject signal/preset/frame calls with
+  `SessionInitFailed` when the session is `Degraded`, so clients see
+  an actionable error instead of a silent no-op.
 
 ### Fixed
 - `heartbeat` PUT now sends an empty JSON body; Synapse's Chroma REST
