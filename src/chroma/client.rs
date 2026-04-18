@@ -86,12 +86,29 @@ impl ChromaClient {
             .send()
             .await
             .map_err(classify_send_error)?;
-        if !resp.status().is_success() {
-            return Err(ChromaError::SessionInitFailed(format!("HTTP {}", resp.status())));
+        let status = resp.status();
+        if status.is_success() {
+            return resp
+                .json::<Session>()
+                .await
+                .map_err(|e| ChromaError::SessionInitFailed(e.to_string()));
         }
-        resp.json::<Session>()
-            .await
-            .map_err(|e| ChromaError::SessionInitFailed(e.to_string()))
+        // Disambiguate: if Synapse's web root is reachable but the Chroma
+        // endpoint returns 404/503, the Chroma module itself is disabled.
+        if status.as_u16() == 404 || status.as_u16() == 503 {
+            let root = self.base_url.trim_end_matches("/razer/chromasdk");
+            if self
+                .http
+                .get(root)
+                .send()
+                .await
+                .map(|r| r.status().is_success())
+                .unwrap_or(false)
+            {
+                return Err(ChromaError::ChromaModuleDisabled);
+            }
+        }
+        Err(ChromaError::SessionInitFailed(format!("HTTP {status}")))
     }
 
     /// PUT an effect to the per-session endpoint `<uri>/<device>`.
@@ -159,6 +176,35 @@ mod tests {
         assert!(
             matches!(err, ChromaError::SynapseNotRunning | ChromaError::Network(_)),
             "got: {err:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn chroma_module_disabled_is_distinct_from_synapse_not_running() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+        let server = MockServer::start().await;
+        // Root probe succeeds → Synapse is up.
+        Mock::given(method("GET"))
+            .and(path("/"))
+            .respond_with(ResponseTemplate::new(200))
+            .mount(&server)
+            .await;
+        // Chroma endpoint returns 404 → module off.
+        Mock::given(method("POST"))
+            .and(path("/razer/chromasdk"))
+            .respond_with(ResponseTemplate::new(404))
+            .mount(&server)
+            .await;
+
+        let client = ChromaClient::with_base_url(&server.uri());
+        let err = client
+            .init_session(serde_json::json!({}))
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, ChromaError::ChromaModuleDisabled),
+            "got {err:?}"
         );
     }
 }
