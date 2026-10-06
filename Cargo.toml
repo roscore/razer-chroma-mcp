@@ -2,7 +2,7 @@
 name = "razer-chroma-mcp"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.85"
+rust-version = "1.88"
 authors = ["roscore <https://github.com/roscore>"]
 license = "MIT OR Apache-2.0"
 description = "MCP server that gives Claude a body language on Razer Chroma keyboards"

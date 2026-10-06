@@ -125,12 +125,12 @@ pub async fn set_static_color(
 
 pub async fn set_custom_grid(c: &StatefulController, a: SetCustomGridArgs) -> Result<StatusOutput> {
     if a.grid.len() != KEYBOARD_ROWS {
-        return Err(anyhow!("grid must have {} rows", KEYBOARD_ROWS));
+        return Err(anyhow!("grid must have {KEYBOARD_ROWS} rows"));
     }
     let mut arr = [[Rgb::BLACK; KEYBOARD_COLS]; KEYBOARD_ROWS];
     for (r, row) in a.grid.iter().enumerate() {
         if row.len() != KEYBOARD_COLS {
-            return Err(anyhow!("row {r} must have {} cols", KEYBOARD_COLS));
+            return Err(anyhow!("row {r} must have {KEYBOARD_COLS} cols"));
         }
         for (col_idx, col) in row.iter().enumerate() {
             arr[r][col_idx] = col.to_rgb()?;
