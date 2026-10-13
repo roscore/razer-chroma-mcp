@@ -9,7 +9,7 @@ use crate::chroma::client::ChromaClient;
 use crate::chroma::session::{Session, SessionConfig};
 use crate::config::merge::{merge, MergeInput, MergeOutcome};
 use crate::config::paths;
-use anyhow::Result;
+use anyhow::{bail, Context, Result};
 use std::io::{BufRead, Write};
 use std::path::PathBuf;
 use std::time::Duration;
@@ -90,7 +90,7 @@ pub async fn run(lang: Option<String>) -> Result<()> {
     }
 
     // 4–5. Register with Claude Desktop / Code
-    let bin = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("razer-chroma-mcp.exe"));
+    let bin = resolve_current_exe(std::env::current_exe)?;
     if let Some(path) = paths::claude_desktop_config() {
         offer_merge(&lang, &path, &bin, "Claude Desktop", &mut reader);
     }
@@ -130,6 +130,26 @@ fn detect_lang() -> String {
         }
     }
     "en".into()
+}
+
+fn resolve_current_exe<F>(current_exe: F) -> Result<PathBuf>
+where
+    F: FnOnce() -> std::io::Result<PathBuf>,
+{
+    let path = current_exe().context(
+        "Could not determine the absolute path of this executable. \
+         Run setup again from the installed executable. \
+         실행 파일의 절대 경로를 확인하지 못했습니다. 설치된 실행 파일에서 setup을 다시 실행해 주세요.",
+    )?;
+    if !path.is_absolute() {
+        bail!(
+            "The executable path is not absolute: {}. \
+             Run setup again from the installed executable. \
+             실행 파일 경로가 절대 경로가 아닙니다. 설치된 실행 파일에서 setup을 다시 실행해 주세요.",
+            path.display()
+        );
+    }
+    Ok(path)
 }
 
 fn say(lang: &str, en: &str, ko: &str) {
@@ -214,5 +234,40 @@ fn offer_merge<R: BufRead>(
                 &format!("[FAIL] {label} 설정을 쓰지 못했습니다: {e}"),
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io;
+    use std::path::Path;
+
+    #[test]
+    fn current_exe_failure_is_reported_instead_of_using_relative_fallback() {
+        let error = resolve_current_exe(|| {
+            Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "injected current_exe failure",
+            ))
+        })
+        .unwrap_err();
+        let message = error.to_string();
+
+        assert!(message.contains("Could not determine the absolute path of this executable"));
+        assert!(message.contains("실행 파일의 절대 경로를 확인하지 못했습니다"));
+        assert!(message.contains("Run setup again from the installed executable"));
+    }
+
+    #[test]
+    fn current_exe_success_preserves_the_absolute_path() {
+        #[cfg(windows)]
+        let expected = Path::new(r"C:\Program Files\razer-chroma-mcp\razer-chroma-mcp.exe");
+        #[cfg(not(windows))]
+        let expected = Path::new("/opt/razer-chroma-mcp/bin/razer-chroma-mcp");
+        let actual = resolve_current_exe(|| Ok(expected.to_path_buf())).unwrap();
+
+        assert_eq!(actual, expected);
+        assert!(actual.is_absolute());
     }
 }
