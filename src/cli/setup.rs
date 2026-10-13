@@ -261,6 +261,9 @@ mod tests {
 
     #[test]
     fn current_exe_success_preserves_the_absolute_path() {
+        #[cfg(windows)]
+        let expected = Path::new(r"C:\Program Files\razer-chroma-mcp\razer-chroma-mcp.exe");
+        #[cfg(not(windows))]
         let expected = Path::new("/opt/razer-chroma-mcp/bin/razer-chroma-mcp");
         let actual = resolve_current_exe(|| Ok(expected.to_path_buf())).unwrap();
 
