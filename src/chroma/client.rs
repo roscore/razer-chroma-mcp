@@ -12,6 +12,44 @@ use std::time::Duration;
 
 const DEFAULT_BASE: &str = "http://localhost:54235/razer/chromasdk";
 
+/// Env var overriding the per-request HTTP timeout in milliseconds.
+pub const TIMEOUT_ENV: &str = "RAZER_CHROMA_TIMEOUT_MS";
+/// Default per-request HTTP timeout (spec §3).
+pub const DEFAULT_TIMEOUT_MS: u64 = 2_000;
+/// Largest accepted override. Larger values would stall the 5s heartbeat loop.
+pub const MAX_TIMEOUT_MS: u64 = 60_000;
+
+/// Resolve the timeout from an optional raw env value.
+///
+/// Returns the timeout to use plus a warning message when `raw` was present
+/// but invalid (empty, non-integer, negative, zero, or above
+/// [`MAX_TIMEOUT_MS`]). Invalid values fall back to [`DEFAULT_TIMEOUT_MS`].
+pub fn resolve_timeout_ms(raw: Option<&str>) -> (u64, Option<String>) {
+    let Some(raw) = raw else {
+        return (DEFAULT_TIMEOUT_MS, None);
+    };
+    let reason = match raw.trim().parse::<u64>() {
+        Ok(0) => "must be greater than 0",
+        Ok(ms) if ms > MAX_TIMEOUT_MS => "exceeds maximum",
+        Ok(ms) => return (ms, None),
+        Err(_) => "not a positive integer",
+    };
+    let warning = format!(
+        "{TIMEOUT_ENV}={raw:?} is invalid ({reason}; allowed 1..={MAX_TIMEOUT_MS}); \
+         using default {DEFAULT_TIMEOUT_MS}ms"
+    );
+    (DEFAULT_TIMEOUT_MS, Some(warning))
+}
+
+fn timeout_from_env() -> u64 {
+    let raw = std::env::var(TIMEOUT_ENV).ok();
+    let (ms, warning) = resolve_timeout_ms(raw.as_deref());
+    if let Some(w) = warning {
+        tracing::warn!("{w}");
+    }
+    ms
+}
+
 fn classify_send_error(e: reqwest::Error) -> ChromaError {
     if e.is_connect() || e.is_timeout() {
         ChromaError::SynapseNotRunning
@@ -58,10 +96,7 @@ impl Default for ChromaClient {
 
 impl ChromaClient {
     pub fn with_base_url(base: &str) -> Self {
-        let timeout_ms = std::env::var("RAZER_CHROMA_TIMEOUT_MS")
-            .ok()
-            .and_then(|s| s.parse::<u64>().ok())
-            .unwrap_or(2_000);
+        let timeout_ms = timeout_from_env();
         let http = Client::builder()
             .timeout(Duration::from_millis(timeout_ms))
             .build()
@@ -212,5 +247,57 @@ mod tests {
             matches!(err, ChromaError::ChromaModuleDisabled),
             "got {err:?}"
         );
+    }
+
+    #[test]
+    fn timeout_unset_uses_default_without_warning() {
+        assert_eq!(resolve_timeout_ms(None), (DEFAULT_TIMEOUT_MS, None));
+    }
+
+    #[test]
+    fn timeout_valid_value_is_used() {
+        assert_eq!(resolve_timeout_ms(Some("1500")), (1500, None));
+        assert_eq!(resolve_timeout_ms(Some(" 750 ")), (750, None));
+    }
+
+    #[test]
+    fn timeout_bounds_are_inclusive() {
+        assert_eq!(resolve_timeout_ms(Some("1")).0, 1);
+        let max = MAX_TIMEOUT_MS.to_string();
+        assert_eq!(resolve_timeout_ms(Some(&max)), (MAX_TIMEOUT_MS, None));
+    }
+
+    fn assert_falls_back(raw: &str) {
+        let (ms, warn) = resolve_timeout_ms(Some(raw));
+        assert_eq!(ms, DEFAULT_TIMEOUT_MS, "raw={raw:?}");
+        let warn = warn.unwrap_or_else(|| panic!("expected warning for {raw:?}"));
+        assert!(
+            warn.contains(TIMEOUT_ENV),
+            "warning should name env var: {warn}"
+        );
+    }
+
+    #[test]
+    fn timeout_zero_falls_back_with_warning() {
+        assert_falls_back("0");
+    }
+
+    #[test]
+    fn timeout_negative_falls_back_with_warning() {
+        assert_falls_back("-5");
+    }
+
+    #[test]
+    fn timeout_non_numeric_falls_back_with_warning() {
+        assert_falls_back("abc");
+        assert_falls_back("2s");
+        assert_falls_back("1.5");
+        assert_falls_back("");
+    }
+
+    #[test]
+    fn timeout_above_max_falls_back_with_warning() {
+        assert_falls_back(&(MAX_TIMEOUT_MS + 1).to_string());
+        assert_falls_back("99999999999999999999999");
     }
 }
