@@ -4,7 +4,7 @@ Thanks for considering a contribution!
 
 ## Dev Setup
 
-- Install Rust 1.85 or newer: <https://rustup.rs>
+- Install Rust 1.88 or newer: <https://rustup.rs>
 - Windows is the primary target. macOS/Linux build but do not distribute.
 - Install Razer Synapse with the Chroma module enabled for live testing.
 
